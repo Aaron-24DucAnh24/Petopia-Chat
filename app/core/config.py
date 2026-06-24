@@ -16,5 +16,8 @@ class Settings(BaseSettings):
   # Redis (reused from Petopia.Backend)
   redis_url: str
 
+  # CORS
+  cors_origins: list[str] = []
+
 
 settings = Settings()

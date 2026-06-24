@@ -1,12 +1,9 @@
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import HTTPException, Request, status
 from jose import JWTError, jwt
 from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.constants import JWT_CLAIM_EMAIL, JWT_CLAIM_ID, JWT_CLAIM_ROLE
-
-bearer_scheme = HTTPBearer()
 
 
 class TokenPayload(BaseModel):
@@ -35,7 +32,11 @@ def decode_token(token: str) -> TokenPayload:
     )
 
 
-def get_current_user(
-  credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-) -> TokenPayload:
-  return decode_token(credentials.credentials)
+def get_current_user(request: Request) -> TokenPayload:
+  user = getattr(request.state, "user", None)
+  if user is None:
+    raise HTTPException(
+      status_code=status.HTTP_401_UNAUTHORIZED,
+      detail="Not authenticated",
+    )
+  return user
