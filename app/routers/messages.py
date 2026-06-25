@@ -9,7 +9,6 @@ from app.core.constants import DEFAULT_MESSAGE_LIMIT, MAX_PAGE_LIMIT
 from app.db.mongodb import get_db
 from app.db.redis import get_redis
 from app.models.message import (
-  ForwardRequest,
   MessageCreate,
   MessageListResponse,
   MessageResponse,
@@ -80,15 +79,3 @@ async def toggle_reaction(
   return await service.toggle_reaction(message_id, current_user.Id, payload.emoji)
 
 
-@router.post(
-  "/messages/{message_id}/forward",
-  response_model=MessageResponse,
-  status_code=status.HTTP_201_CREATED,
-)
-async def forward_message(
-  message_id: str,
-  payload: ForwardRequest,
-  current_user: TokenPayload = Depends(get_current_user),
-  service: MessageService = Depends(get_service),
-) -> MessageResponse:
-  return await service.forward_message(message_id, payload, current_user.Id)

@@ -35,18 +35,12 @@ class MessageResponse(BaseModel):
   sent_at: datetime
   read_by: list[str]
   reply_to: ReplyPreview | None
-  is_forwarded: bool
-  forwarded_from_message_id: str | None
   reactions: dict[str, list[str]]
   is_deleted: bool
 
 
 class ReactionRequest(BaseModel):
   emoji: str
-
-
-class ForwardRequest(BaseModel):
-  target_conversation_id: str
 
 
 class MessageListResponse(BaseModel):

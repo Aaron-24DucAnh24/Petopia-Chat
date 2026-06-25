@@ -15,7 +15,6 @@ from app.core.constants import (
 )
 from app.core.exceptions import bad_request, forbidden, not_found
 from app.models.message import (
-  ForwardRequest,
   MessageCreate,
   MessageListResponse,
   MessageResponse,
@@ -47,8 +46,6 @@ def _doc_to_response(doc: dict) -> MessageResponse:
     sent_at=doc["sent_at"],
     read_by=doc.get("read_by", []),
     reply_to=reply_to,
-    is_forwarded=doc.get("is_forwarded", False),
-    forwarded_from_message_id=doc.get("forwarded_from_message_id"),
     reactions=doc.get("reactions", {}),
     is_deleted=doc.get("is_deleted", False),
   )
@@ -157,8 +154,6 @@ class MessageService:
       "sent_at": now,
       "read_by": [sender_id],
       "reply_to": reply_to_doc,
-      "is_forwarded": False,
-      "forwarded_from_message_id": None,
       "reactions": {},
       "is_deleted": False,
       "deleted_at": None,
@@ -265,70 +260,6 @@ class MessageService:
         type=WsEventType.reaction_updated,
         payload=response.model_dump(mode="json"),
       ),
-    )
-    return response
-
-  async def forward_message(
-    self, message_id: str, payload: ForwardRequest, sender_id: str
-  ) -> MessageResponse:
-    original = await self._get_message(message_id)
-    if original.get("is_deleted"):
-      raise bad_request("Cannot forward a deleted message")
-
-    target_conv = await self._require_participant(payload.target_conversation_id, sender_id)
-
-    now = datetime.now(timezone.utc)
-    doc: dict = {
-      "conversation_id": ObjectId(payload.target_conversation_id),
-      "sender_id": sender_id,
-      "content": original.get("content"),
-      "message_type": original["message_type"],
-      "media_url": original.get("media_url"),
-      "sent_at": now,
-      "read_by": [sender_id],
-      "reply_to": None,
-      "is_forwarded": True,
-      "forwarded_from_message_id": message_id,
-      "reactions": {},
-      "is_deleted": False,
-      "deleted_at": None,
-    }
-    result = await self.collection.insert_one(doc)
-    doc["_id"] = result.inserted_id
-
-    await self.conversations.update_one(
-      {"_id": ObjectId(payload.target_conversation_id)},
-      {
-        "$set": {
-          "updated_at": now,
-          "last_message_preview": {
-            "content": original.get("content"),
-            "sender_id": sender_id,
-            "sent_at": now,
-            "message_type": original["message_type"],
-          },
-        }
-      },
-    )
-
-    response = _doc_to_response(doc)
-    recipients = [uid for uid in target_conv["participants"] if uid != sender_id]
-
-    if recipients:
-      target_conv_id = payload.target_conversation_id
-      active_users: set = await self.redis.smembers(f"active_conv:{target_conv_id}")
-      active_str = {u.decode() if isinstance(u, bytes) else u for u in active_users}
-      for uid in recipients:
-        if uid not in active_str:
-          await self.unread.update_one(
-            {"user_id": uid, "conversation_id": target_conv_id},
-            {"$setOnInsert": {"user_id": uid, "conversation_id": target_conv_id}},
-            upsert=True,
-          )
-
-    await self._publish(
-      recipients,
-      WsEvent(type=WsEventType.new_message, payload=response.model_dump(mode="json")),
     )
     return response
 
