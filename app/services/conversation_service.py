@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from app.core.constants import CONVERSATIONS_COLLECTION
+from app.core.constants import CONVERSATIONS_COLLECTION, UNREAD_MESSAGES_COLLECTION
 from app.core.exceptions import bad_request, forbidden, not_found
 from app.models.conversation import (
   ConversationCreate,
@@ -28,6 +28,7 @@ def _doc_to_response(doc: dict) -> ConversationResponse:
     created_at=doc["created_at"],
     updated_at=doc["updated_at"],
     last_message_preview=LastMessagePreview(**lmp) if lmp else None,
+    unread_count=doc.get("unread_count", 0),
   )
 
 
@@ -35,6 +36,7 @@ class ConversationService:
   def __init__(self, db: AsyncIOMotorDatabase) -> None:
     self.db = db
     self.collection = db[CONVERSATIONS_COLLECTION]
+    self.unread = db[UNREAD_MESSAGES_COLLECTION]
 
   async def list_conversations(
     self, user_id: str, cursor: str | None, limit: int
@@ -68,6 +70,19 @@ class ConversationService:
       if has_more and items
       else None
     )
+
+    # Attach unread_count per conversation from the unread_messages collection
+    if items:
+      conversation_ids = [str(d["_id"]) for d in items]
+      pipeline = [
+        {"$match": {"user_id": user_id, "conversation_id": {"$in": conversation_ids}}},
+        {"$group": {"_id": "$conversation_id", "count": {"$sum": 1}}},
+      ]
+      unread_map: dict[str, int] = {}
+      async for bucket in self.unread.aggregate(pipeline):
+        unread_map[bucket["_id"]] = bucket["count"]
+      for d in items:
+        d["unread_count"] = unread_map.get(str(d["_id"]), 0)
 
     return ConversationListResponse(
       items=[_doc_to_response(d) for d in items],

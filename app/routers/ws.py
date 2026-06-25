@@ -92,10 +92,58 @@ async def websocket_endpoint(
           except Exception as e:
             logger.warning("mark_read failed for user=%s conv=%s: %s", user.Id, conversation_id, e)
 
+      elif event.type == WsEventType.conversation_opened:
+        conversation_id = event.payload.get("conversation_id")
+        if conversation_id:
+          await _set_active_conversation(redis, user.Id, conversation_id)
+
+      elif event.type == WsEventType.conversation_closed:
+        conversation_id = event.payload.get("conversation_id")
+        if conversation_id:
+          await _clear_active_conversation(redis, user.Id, conversation_id)
+
   except WebSocketDisconnect:
     logger.info("WS disconnected: user=%s", user.Id)
   finally:
     redis_task.cancel()
+    await _cleanup_active_conversation(redis, user.Id)
+
+
+_ACTIVE_CONV_TTL = 3600  # seconds — safety-net TTL in case disconnect cleanup is missed
+
+
+async def _set_active_conversation(
+  redis: aioredis.Redis,
+  user_id: str,
+  conversation_id: str,
+) -> None:
+  """Mark user as actively viewing a conversation (prevents unread inserts)."""
+  await redis.set(f"user_active_conv:{user_id}", conversation_id, ex=_ACTIVE_CONV_TTL)
+  await redis.sadd(f"active_conv:{conversation_id}", user_id)
+  await redis.expire(f"active_conv:{conversation_id}", _ACTIVE_CONV_TTL)
+
+
+async def _clear_active_conversation(
+  redis: aioredis.Redis,
+  user_id: str,
+  conversation_id: str,
+) -> None:
+  """Remove user from an active conversation set."""
+  await redis.delete(f"user_active_conv:{user_id}")
+  await redis.srem(f"active_conv:{conversation_id}", user_id)
+
+
+async def _cleanup_active_conversation(redis: aioredis.Redis, user_id: str) -> None:
+  """On WS disconnect: remove the user from whichever conversation they had open."""
+  try:
+    conv_id = await redis.get(f"user_active_conv:{user_id}")
+    if conv_id:
+      if isinstance(conv_id, bytes):
+        conv_id = conv_id.decode()
+      await redis.srem(f"active_conv:{conv_id}", user_id)
+      await redis.delete(f"user_active_conv:{user_id}")
+  except Exception as e:
+    logger.warning("cleanup_active_conversation failed for user=%s: %s", user_id, e)
 
 
 async def _handle_typing(

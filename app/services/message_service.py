@@ -11,6 +11,7 @@ from app.core.constants import (
   MESSAGES_COLLECTION,
   REDIS_CHAT_CHANNEL_PREFIX,
   REPLY_PREVIEW_MAX_LENGTH,
+  UNREAD_MESSAGES_COLLECTION,
 )
 from app.core.exceptions import bad_request, forbidden, not_found
 from app.models.message import (
@@ -59,6 +60,7 @@ class MessageService:
     self.redis = redis
     self.collection = db[MESSAGES_COLLECTION]
     self.conversations = db[CONVERSATIONS_COLLECTION]
+    self.unread = db[UNREAD_MESSAGES_COLLECTION]
 
   # ------------------------------------------------------------------
   # Helpers
@@ -181,6 +183,20 @@ class MessageService:
 
     response = _doc_to_response(doc)
     recipients = [uid for uid in conv["participants"] if uid != sender_id]
+
+    # Upsert an unread marker for recipients who don't have this conversation open
+    if recipients:
+      active_users: set = await self.redis.smembers(f"active_conv:{conversation_id}")
+      # smembers may return bytes; decode for comparison
+      active_str = {u.decode() if isinstance(u, bytes) else u for u in active_users}
+      for uid in recipients:
+        if uid not in active_str:
+          await self.unread.update_one(
+            {"user_id": uid, "conversation_id": conversation_id},
+            {"$setOnInsert": {"user_id": uid, "conversation_id": conversation_id}},
+            upsert=True,
+          )
+
     await self._publish(
       recipients,
       WsEvent(type=WsEventType.new_message, payload=response.model_dump(mode="json")),
@@ -297,6 +313,19 @@ class MessageService:
 
     response = _doc_to_response(doc)
     recipients = [uid for uid in target_conv["participants"] if uid != sender_id]
+
+    if recipients:
+      target_conv_id = payload.target_conversation_id
+      active_users: set = await self.redis.smembers(f"active_conv:{target_conv_id}")
+      active_str = {u.decode() if isinstance(u, bytes) else u for u in active_users}
+      for uid in recipients:
+        if uid not in active_str:
+          await self.unread.update_one(
+            {"user_id": uid, "conversation_id": target_conv_id},
+            {"$setOnInsert": {"user_id": uid, "conversation_id": target_conv_id}},
+            upsert=True,
+          )
+
     await self._publish(
       recipients,
       WsEvent(type=WsEventType.new_message, payload=response.model_dump(mode="json")),
@@ -314,6 +343,9 @@ class MessageService:
       },
       {"$addToSet": {"read_by": user_id}},
     )
+
+    # Clear unread tracking for this user+conversation
+    await self.unread.delete_many({"user_id": user_id, "conversation_id": conversation_id})
 
     # Notify distinct senders (other than the reader) about the read receipt
     senders: list[str] = await self.collection.distinct(

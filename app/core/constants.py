@@ -1,6 +1,7 @@
 # MongoDB collection names
 CONVERSATIONS_COLLECTION = "conversations"
 MESSAGES_COLLECTION = "messages"
+UNREAD_MESSAGES_COLLECTION = "unread_messages"
 
 # Redis Pub/Sub channel prefix per user
 REDIS_CHAT_CHANNEL_PREFIX = "chat:"

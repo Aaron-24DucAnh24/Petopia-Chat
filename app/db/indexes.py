@@ -1,7 +1,7 @@
 import pymongo
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from app.core.constants import CONVERSATIONS_COLLECTION, MESSAGES_COLLECTION
+from app.core.constants import CONVERSATIONS_COLLECTION, MESSAGES_COLLECTION, UNREAD_MESSAGES_COLLECTION
 
 
 async def create_indexes(db: AsyncIOMotorDatabase) -> None:
@@ -24,4 +24,10 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
   await messages.create_index([("sender_id", pymongo.ASCENDING)])
   await messages.create_index(
     [("reply_to.message_id", pymongo.ASCENDING)], sparse=True
+  )
+
+  unread = db[UNREAD_MESSAGES_COLLECTION]
+  await unread.create_index(
+    [("user_id", pymongo.ASCENDING), ("conversation_id", pymongo.ASCENDING)],
+    unique=True,
   )

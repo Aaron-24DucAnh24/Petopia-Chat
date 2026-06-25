@@ -60,6 +60,8 @@ class WsEventType(str, Enum):
   reaction_updated = "reaction_updated"
   user_typing = "user_typing"
   messages_read = "messages_read"
+  conversation_opened = "conversation_opened"
+  conversation_closed = "conversation_closed"
 
 
 class WsEvent(BaseModel):

@@ -38,6 +38,7 @@ class ConversationResponse(BaseModel):
   created_at: datetime
   updated_at: datetime
   last_message_preview: LastMessagePreview | None
+  unread_count: int = 0
 
 
 class ConversationListResponse(BaseModel):

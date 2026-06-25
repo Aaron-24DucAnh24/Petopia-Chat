@@ -19,6 +19,7 @@ def decode_token(token: str) -> TokenPayload:
       settings.jwt_secret,
       algorithms=[settings.jwt_algorithm],
       issuer=settings.jwt_issuer,
+      audience=settings.jwt_issuer,
     )
     return TokenPayload(
       Id=payload[JWT_CLAIM_ID],
