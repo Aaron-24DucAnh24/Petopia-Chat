@@ -26,14 +26,14 @@ from app.models.message import (
 
 
 def _doc_to_response(doc: dict) -> MessageResponse:
-  rt = doc.get("reply_to")
+  reply_to_doc = doc.get("reply_to")
   reply_to = (
     ReplyPreview(
-      message_id=rt["message_id"],
-      sender_id=rt["sender_id"],
-      content_preview=rt["content_preview"],
+      message_id=reply_to_doc["message_id"],
+      sender_id=reply_to_doc["sender_id"],
+      content_preview=reply_to_doc["content_preview"],
     )
-    if rt
+    if reply_to_doc
     else None
   )
   return MessageResponse(
@@ -63,7 +63,7 @@ class MessageService:
   # Helpers
   # ------------------------------------------------------------------
 
-  async def _require_participant(self, conversation_id: str, user_id: str) -> dict:
+  async def _validate_participant(self, conversation_id: str, user_id: str) -> dict:
     try:
       oid = ObjectId(conversation_id)
     except Exception:
@@ -97,7 +97,7 @@ class MessageService:
   async def list_messages(
     self, conversation_id: str, user_id: str, cursor: str | None, limit: int
   ) -> MessageListResponse:
-    await self._require_participant(conversation_id, user_id)
+    await self._validate_participant(conversation_id, user_id)
 
     query: dict = {
       "conversation_id": ObjectId(conversation_id),
@@ -128,7 +128,7 @@ class MessageService:
   async def send_message(
     self, conversation_id: str, payload: MessageCreate, sender_id: str
   ) -> MessageResponse:
-    conv = await self._require_participant(conversation_id, sender_id)
+    conversation_doc = await self._validate_participant(conversation_id, sender_id)
 
     if payload.message_type == MessageType.text and not payload.content:
       raise bad_request("Text messages must have content")
@@ -177,7 +177,7 @@ class MessageService:
     )
 
     response = _doc_to_response(doc)
-    recipients = [uid for uid in conv["participants"] if uid != sender_id]
+    recipients = [uid for uid in conversation_doc["participants"] if uid != sender_id]
 
     # Upsert an unread marker for recipients who don't have this conversation open
     if recipients:
@@ -264,7 +264,7 @@ class MessageService:
     return response
 
   async def mark_read(self, conversation_id: str, user_id: str) -> None:
-    await self._require_participant(conversation_id, user_id)
+    await self._validate_participant(conversation_id, user_id)
 
     await self.collection.update_many(
       {

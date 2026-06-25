@@ -19,8 +19,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
     if path in _PUBLIC_PATHS or path.startswith("/docs"):
       return await call_next(request)
 
-    authorization: str = request.headers.get("Authorization", "")
-    scheme, _, credentials = authorization.partition(" ")
+    auth_sequence: str = request.headers.get("Authorization", "")
+    scheme, _, credentials = auth_sequence.partition(" ")
 
     if scheme.lower() != "bearer" or not credentials:
       return JSONResponse(status_code=401, content={"detail": "Not authenticated"})

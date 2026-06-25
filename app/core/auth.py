@@ -6,13 +6,13 @@ from app.core.config import settings
 from app.core.constants import JWT_CLAIM_EMAIL, JWT_CLAIM_ID, JWT_CLAIM_ROLE
 
 
-class TokenPayload(BaseModel):
+class UserContextModel(BaseModel):
   Id: str
   Email: str
   Role: str
 
 
-def decode_token(token: str) -> TokenPayload:
+def decode_token(token: str) -> UserContextModel:
   try:
     payload = jwt.decode(
       token,
@@ -21,7 +21,7 @@ def decode_token(token: str) -> TokenPayload:
       issuer=settings.jwt_issuer,
       audience=settings.jwt_issuer,
     )
-    return TokenPayload(
+    return UserContextModel(
       Id=payload[JWT_CLAIM_ID],
       Email=payload[JWT_CLAIM_EMAIL],
       Role=payload[JWT_CLAIM_ROLE],
@@ -33,7 +33,7 @@ def decode_token(token: str) -> TokenPayload:
     )
 
 
-def get_current_user(request: Request) -> TokenPayload:
+def get_current_user(request: Request) -> UserContextModel:
   user = getattr(request.state, "user", None)
   if user is None:
     raise HTTPException(

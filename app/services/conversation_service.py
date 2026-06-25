@@ -48,7 +48,6 @@ class ConversationService:
         raw_dt, raw_id = cursor.split("|", 1)
         cursor_dt = datetime.fromisoformat(raw_dt)
         cursor_oid = ObjectId(raw_id)
-        # Stable pagination: same updated_at falls back to _id ordering
         query["$or"] = [
           {"updated_at": {"$lt": cursor_dt}},
           {"updated_at": cursor_dt, "_id": {"$lt": cursor_oid}},
@@ -71,7 +70,6 @@ class ConversationService:
       else None
     )
 
-    # Attach unread_count per conversation from the unread_messages collection
     if items:
       conversation_ids = [str(d["_id"]) for d in items]
       pipeline = [

@@ -10,11 +10,8 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
   await conversations.create_index(
     [("updated_at", pymongo.DESCENDING), ("_id", pymongo.DESCENDING)]
   )
-  # Enforces uniqueness for direct conversations at the DB level (prevents TOCTOU duplicates)
   await conversations.create_index(
-    [("participants_key", pymongo.ASCENDING)],
-    unique=True,
-    sparse=True,
+    [("participants_key", pymongo.ASCENDING)], unique=True,sparse=True,
   )
 
   messages = db[MESSAGES_COLLECTION]
@@ -28,6 +25,5 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
 
   unread = db[UNREAD_MESSAGES_COLLECTION]
   await unread.create_index(
-    [("user_id", pymongo.ASCENDING), ("conversation_id", pymongo.ASCENDING)],
-    unique=True,
+    [("user_id", pymongo.ASCENDING), ("conversation_id", pymongo.ASCENDING)], unique=True,
   )

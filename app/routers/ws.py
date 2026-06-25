@@ -7,7 +7,7 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from app.core.auth import TokenPayload, decode_token
+from app.core.auth import UserContextModel, decode_token
 from app.core.constants import (
   CONVERSATIONS_COLLECTION,
   REDIS_CHAT_CHANNEL_PREFIX,
@@ -59,7 +59,7 @@ async def websocket_endpoint(
   Outgoing server event format: WsEvent JSON
   """
   try:
-    user: TokenPayload = decode_token(token)
+    user: UserContextModel = decode_token(token)
   except HTTPException:
     await websocket.close(code=WS_CLOSE_UNAUTHORIZED, reason="Unauthorized")
     return
