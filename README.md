@@ -23,65 +23,18 @@ It runs independently from the main ASP.NET Core backend and reuses the same JWT
 
 ---
 
-## Prerequisites
+## Local development
 
-- Python 3.9+
-- Docker (for MongoDB)
-- Access to the existing **Petopia.Backend Redis** instance (reused for Pub/Sub)
+Environment setup (MongoDB and Redis via the shared Docker Compose file, `.env` template, backend) and run instructions for every Petopia service live in the umbrella repository:
 
----
+**https://github.com/Aaron-24DucAnh24/Petopia#readme**
 
-## Setup
-
-### 1. Clone and enter the directory
+This repository doesn't ship its own `docker-compose.yml`. Once the infrastructure is up and `.env` is in place:
 
 ```bash
-cd Petopia-Chat
+make install   # create .venv and install dependencies
+make dev       # http://localhost:8000, auto-reload
 ```
-
-### 2. Create a virtual environment and install dependencies
-
-```bash
-make install
-# or manually:
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-### 3. Configure environment variables
-
-```bash
-cp .env.example .env
-```
-
-Open `.env` and set at minimum:
-
-| Variable | Description |
-|----------|-------------|
-| `JWT_SECRET` | Must match `Token:AccessTokenKey` in `Petopia.Backend/appsettings.json` |
-| `MONGODB_URL` | MongoDB connection URL with credentials |
-| `REDIS_URL` | URL of the existing Petopia Redis instance |
-
-### 4. Start MongoDB
-
-```bash
-make docker-up
-```
-
-This starts a local MongoDB container with the credentials from your `.env` file.
-
-### 5. Run the service
-
-```bash
-# Development (auto-reload on file changes)
-make dev
-
-# Production
-make run
-```
-
-The service starts on `http://localhost:8000`.
 
 ---
 
@@ -134,5 +87,5 @@ Connect to `/ws?token=<access_token>`.
 | `make install` | Create `.venv` and install dependencies |
 | `make dev` | Run with auto-reload (development) |
 | `make run` | Run for production |
-| `make docker-up` | Start MongoDB container in background |
-| `make docker-down` | Stop and remove MongoDB container |
+| `make test` | Run the test suite (needs MongoDB and Redis running) |
+
